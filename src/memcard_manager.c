@@ -360,3 +360,110 @@ uint32_t memcard_manager_create(uint8_t* out_filename) {
 	update_prev_loaded_memcard_index(memcard_n - 1);
 	return MM_OK;
 }
+
+uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
+	uint8_t new_name[MAX_MC_FILENAME_LEN + 1];
+
+	FIL fptr;
+
+	FRESULT fr;
+	fr = f_open(&fptr, "index.txt", FA_OPEN_ALWAYS | FA_READ |FA_WRITE);
+
+	if (fr != FR_OK) {
+		printf("error opening file. Skill issue\n");
+		return FR_DISK_ERR;
+	}
+	else {
+		printf("The file is created Successfully.\n");
+	}
+
+	char data[128];
+	int ind = 0;
+
+	//we init the var otherwise it will be dirty as hell
+	memset(data, 0, 128);
+	memset(new_name, 0, 33);
+	memset(out_filename, 0, 33);
+
+	for(int i = 0; i < size;)
+	{
+		if(vec[i] == ':'){
+			for(int j=i+1; j < size;){
+			// printf("%s %d\n", vec[j], j);
+				if(vec[j] == ';'){
+					++ind;
+					break;
+				}
+				data[ind] = vec[j];
+				++j; ++ind;
+			}
+		}
+		++i;
+	}
+	
+	printf("finished build string: %s\n", data); 
+
+	if (fr == FR_OK) {
+		char line[256];
+		bool flag = false;
+		//checks if the ID is already present
+		while (f_gets(line, sizeof(line), &fptr)){
+			if(strncmp(data, line, ind) == 0){
+				flag = true;
+				printf("GAMEID already present\n");
+				break;
+			}
+		}
+		//if it is we search the memorycard assigned to it
+		if(flag){
+			if(line[ind] == ':'){
+				ind++;
+				for(int y = 0; y < MAX_MC_FILENAME_LEN + 1; y++){
+					if(line[ind] == '\n'){
+						break;
+					}
+					new_name[y] = line[ind];
+					ind++;
+				}
+				strcpy(out_filename, new_name);
+				printf("\n out name is: %s\n", out_filename);
+			}else{
+				printf("\n COULD NOT FIND ':' CHAR FIX YOUR INDEX FILE\n");
+				return FR_DISK_ERR;
+			}
+			
+		}
+		//if it is not, then we add the GAMEID with the new MCR file
+		else if(!flag){
+			printf("GAMEID not present, writing to index.txt\n");
+			uint32_t status = memcard_manager_create(new_name);
+			bool writeflag = false;
+			data[ind] = ':';
+			++ind;
+			int j = 0;
+			while (true){
+				if(new_name[j] == 'R'){
+					data[ind] = new_name[j];
+					ind++;
+					data[ind] = '\n';
+					break;
+				}else if(j > 33){
+				//this should not happen	
+					break;
+				}else{
+					data[ind] = new_name[j];
+					++ind; ++j;
+				}
+			}
+			f_puts(data, &fptr);
+			strcpy(out_filename, new_name);
+			printf("\n THE NEW MCR IS: %s\n", out_filename);
+		}
+	}else{
+		//this should not happen
+		printf("WE HAVE A HUGE PROBLEM!\n");
+		return FR_DISK_ERR;
+	}
+	f_close(&fptr);
+	return MM_OK;
+}

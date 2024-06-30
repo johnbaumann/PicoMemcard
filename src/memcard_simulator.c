@@ -47,9 +47,12 @@ memory_card_t mc;
 bool request_next_mc = false;
 bool request_prev_mc = false;
 bool request_new_mc = false;
+bool indexfile = false;
 mutex_t write_transaction;
 queue_t mc_sector_sync_queue;
 const uint8_t id_data[] = {0x04, 0x00, 0x00, 0x80};
+uint8_t game_id_len;
+uint8_t game_id[255];
 
 void simulate_mc_reconnect() {
     irq_set_enabled(IO_IRQ_BANK0, false);
@@ -183,22 +186,35 @@ void process_memcard_cmd() {
                 printf("MC Received Ping from PS\n");
             }
             break;
+        #ifdef GAMEID
         case MEMCARD_GAMEID:
             {
                 SEND(0x00);
-                uint8_t game_id_len = RECV_CMD();
+                game_id_len = RECV_CMD();
+                //if the xstation won't give us the length, then we are the length
+                if(game_id_len == 0){
+                    game_id_len = 128;
+                }
                 data = 0x00;
-                uint8_t game_id[256] = {0};
+                int i;
                 /* read game id */
-                for(uint32_t i = 0; i < game_id_len; i++) {
+                while (i < game_id_len){
                     SEND(data); // ack previous data
                     data = RECV_CMD();
                     game_id[i] = data;
+                    if(game_id[i] == ';'){
+                        break;
+                    }
+                    i++;
                 }
-                SEND(data); // ack last byte
-                printf("Game ID: %s\n", game_id);
+                game_id_len = i;
+                printf("%s", game_id);
+                //SEND(data); // ack last byte (not required)
+                indexfile = true;
+
             }
             break;
+        #endif
         default:
             break;
     }
@@ -423,6 +439,28 @@ _Noreturn int simulate_memory_card() {
                 simulate_mc_reconnect();
                 request_new_mc = false;
                 mutex_exit(&write_transaction);
-		}
+		} else if(indexfile){
+            mutex_enter_blocking(&write_transaction);
+            /* ensure latest write operations have been synced */
+            led_output_sync_status(true);
+            while(!queue_is_empty(&mc_sector_sync_queue))
+                queue_sync_step(&mc_sector_sync_queue, mc_file_name);
+            led_output_sync_status(false);
+            uint8_t new_name[MAX_MC_FILENAME_LEN + 1];
+            status = create_index(game_id, game_id_len, new_name); //we do game id stuff here
+            if(status == MM_OK) {
+                led_output_new_mc();
+                strcpy(mc_file_name, new_name);
+                status = memory_card_import(&mc, mc_file_name);	// switch to newly/already created mc image
+                if(status != MC_OK)
+                    led_blink_error(status);
+            } else
+                led_blink_error(status);
+            printf("\n THE NEW MC MOUNTED IS: %s\n", mc_file_name);
+            simulate_mc_reconnect();
+            indexfile = false;
+            memset(game_id, '\0', 255);
+            mutex_exit(&write_transaction);
+        }
 	}
 }
