@@ -191,7 +191,7 @@ Special thanks to everybody that supported it so far! You are all amazing.
 For people interested in understanding how PicoMemcard works I provide a more extensive explanation in [this post] (although now somewhat outdated).
 
 ## Thanks To
-* []
+* [Schermaiolo] - Writing the Game ID write function
 * [SantX27] - Debugging the 1.0.3 firmware to work on the Bitfunx Memory card
 * [wired-filipino-owl] - Documentation and implementation of the led functionality on the Bitfunx Memory card.
 * [psx-spx] and Martin "NO$PSX" Korth - PlayStation Specifications and documented Memory Card protocol and filesystem.
@@ -201,6 +201,7 @@ For people interested in understanding how PicoMemcard works I provide a more ex
 * [Scoppy] - Use your Raspberry Pi Pico as an oscilloscope, very cheap and accurate. Without this I would have not been able to debug many issues.
 * [PulseView] - Used to import, visualize and manipulate the data from Scoppy on a PC.
 
+[Schermaiolo]: https://github.com/schermaiolo
 [SantX27]: https://github.com/SantX27
 [wired-filipino-owl]: https://github.com/wired-filipino-owl
 [FreePSXBoot]: https://github.com/brad-lin/FreePSXBoot
