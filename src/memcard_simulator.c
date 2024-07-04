@@ -1,4 +1,5 @@
 #include <string.h>
+#include <stdlib.h>
 #include "memcard_simulator.h"
 #include "stdio.h"
 #include "pico/multicore.h"
@@ -51,8 +52,8 @@ bool indexfile = false;
 mutex_t write_transaction;
 queue_t mc_sector_sync_queue;
 const uint8_t id_data[] = {0x04, 0x00, 0x00, 0x80};
-uint8_t game_id_len;
-uint8_t game_id[255];
+uint8_t game_id_len = 0;
+uint8_t game_id[24];
 
 void simulate_mc_reconnect() {
     irq_set_enabled(IO_IRQ_BANK0, false);
@@ -183,35 +184,54 @@ void process_memcard_cmd() {
                 RECV_CMD();
                 SEND(0x27); // card present
                 RECV_CMD();
+                SEND(0xFF); // send ack
                 printf("MC Received Ping from PS\n");
+            }
+            break;
+        case MEMCARD_PREV_CARD:
+            {
+                SEND(0x00); // byte 1 reserved
+                RECV_CMD();
+                SEND(0x20); // SUCC
+                RECV_CMD();
+                SEND(0xFF); // Termination signal
+                request_prev_mc = true;
+            }
+            break;
+        case MEMCARD_NEXT_CARD:
+            {
+                SEND(0x00); // byte 1 reserved
+                RECV_CMD();
+                SEND(0x00); // byte 2 reserved
+                RECV_CMD();
+                SEND(0x20); // SUCC
+                RECV_CMD();
+                SEND(0xFF); // Termination signal
+                request_next_mc = true;
             }
             break;
         #ifdef GAMEID
         case MEMCARD_GAMEID:
             {
                 SEND(0x00);
+                RECV_CMD(); //reserved
+                SEND(0x00); //reserved
                 game_id_len = RECV_CMD();
+                data = 0x00;
                 //if the xstation won't give us the length, then we are the length
                 if(game_id_len == 0){
-                    game_id_len = 128;
+                    game_id_len = 24;
                 }
-                data = 0x00;
-                int i;
+                printf("%d\n", game_id_len);
                 /* read game id */
-                while (i < game_id_len){
+                for(int i = 0; i < game_id_len; i++){
                     SEND(data); // ack previous data
                     data = RECV_CMD();
                     game_id[i] = data;
-                    if(game_id[i] == ';'){
-                        break;
-                    }
-                    i++;
                 }
-                game_id_len = i;
-                printf("%s", game_id);
-                //SEND(data); // ack last byte (not required)
+                printf("%s\n", game_id);
+                SEND(data); // ack last byte
                 indexfile = true;
-
             }
             break;
         #endif
@@ -452,14 +472,18 @@ _Noreturn int simulate_memory_card() {
                 led_output_new_mc();
                 strcpy(mc_file_name, new_name);
                 status = memory_card_import(&mc, mc_file_name);	// switch to newly/already created mc image
-                if(status != MC_OK)
+                if(status != MC_OK){
                     led_blink_error(status);
-            } else
+                }
+                printf("\n THE NEW MC MOUNTED IS: %s\n", mc_file_name);
+            }else if(status == 1){
+                //he did nothing
+                printf("\ndid nothing\n");
+            }else
                 led_blink_error(status);
-            printf("\n THE NEW MC MOUNTED IS: %s\n", mc_file_name);
             simulate_mc_reconnect();
+            //update_prev_loaded_memcard_index(atoi(new_name));
             indexfile = false;
-            memset(game_id, '\0', 255);
             mutex_exit(&write_transaction);
         }
 	}

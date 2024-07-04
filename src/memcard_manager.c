@@ -381,27 +381,29 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 	int ind = 0;
 
 	//we init the var otherwise it will be dirty as hell
-	memset(data, 0, 128);
-	memset(new_name, 0, 33);
-	memset(out_filename, 0, 33);
+	memset(data, '\0', 128);
+	memset(new_name, '\0', 33);
+	memset(out_filename, '\0', 33);
 
-	for(int i = 0; i < size;)
-	{
+	for(int i = 0; i < size; i++){
 		if(vec[i] == ':'){
-			for(int j=i+1; j < size;){
-			// printf("%s %d\n", vec[j], j);
+			for(int j = i + 1; j < size; j++){
 				if(vec[j] == ';'){
-					++ind;
 					break;
 				}
 				data[ind] = vec[j];
-				++j; ++ind;
+				ind++;
 			}
 		}
-		++i;
 	}
+	printf("the array is: %s\n", data);
 	
-	printf("finished build string: %s\n", data); 
+	// check if the string is \PSIO and if it is we get the hell out of here
+	if(strcmp(data, "\\PSIO") == 0 ||strcmp(data, "/XSTATION") == 0){
+		printf("\nSkipped psio/xstation\n");
+		f_close(&fptr);
+		return 1;
+	}
 
 	if (fr == FR_OK) {
 		char line[256];
@@ -417,18 +419,20 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 		//if it is we search the memorycard assigned to it
 		if(flag){
 			if(line[ind] == ':'){
+				int len = 1;
 				ind++;
 				for(int y = 0; y < MAX_MC_FILENAME_LEN + 1; y++){
 					if(line[ind] == '\n'){
 						break;
 					}
 					new_name[y] = line[ind];
-					ind++;
+					ind++; 
 				}
 				strcpy(out_filename, new_name);
-				printf("\n out name is: %s\n", out_filename);
+				printf("memcard is: %s\n", out_filename);
 			}else{
 				printf("\n COULD NOT FIND ':' CHAR FIX YOUR INDEX FILE\n");
+				f_close(&fptr);
 				return FR_DISK_ERR;
 			}
 			
@@ -437,24 +441,11 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 		else if(!flag){
 			printf("GAMEID not present, writing to index.txt\n");
 			uint32_t status = memcard_manager_create(new_name);
-			bool writeflag = false;
-			data[ind] = ':';
-			++ind;
-			int j = 0;
-			while (true){
-				if(new_name[j] == 'R'){
-					data[ind] = new_name[j];
-					ind++;
-					data[ind] = '\n';
-					break;
-				}else if(j > 33){
-				//this should not happen	
-					break;
-				}else{
-					data[ind] = new_name[j];
-					++ind; ++j;
-				}
-			}
+			//we concatenate stuff to have a valid id with the memcard
+			strcat(data, ":");
+			strcat(data, new_name);
+			strcat(data, "\n");
+			printf("\n what i write: %s", data);
 			f_puts(data, &fptr);
 			strcpy(out_filename, new_name);
 			printf("\n THE NEW MCR IS: %s\n", out_filename);
@@ -462,6 +453,7 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 	}else{
 		//this should not happen
 		printf("WE HAVE A HUGE PROBLEM!\n");
+		f_close(&fptr);
 		return FR_DISK_ERR;
 	}
 	f_close(&fptr);
