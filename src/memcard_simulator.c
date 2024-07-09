@@ -350,9 +350,11 @@ _Noreturn int simulate_memory_card() {
 		while(true)
 			led_blink_error(1);
 	}
+    printf("sd card mounted\n");
 
     uint32_t status = memory_card_init(&mc);
 	if(status != MC_OK) {
+        printf("could not init memcard\n");
 		while(true) {
 			led_blink_error(status);
 			sleep_ms(2000);
@@ -362,14 +364,17 @@ _Noreturn int simulate_memory_card() {
 	if(status != MM_OK) {
 		status = memcard_manager_get(0, mc_file_name);	// revert to first mem card if failing to load previously loaded card
 		if(status != MM_OK) {
+            printf("could not load memcard\n");
 			while(true) {
 				led_blink_error(status);
 				sleep_ms(1000);
 			}
 		}
 	}
+    printf("mcfilename: %s\n", mc_file_name);
 	status = memory_card_import(&mc, mc_file_name);
 	if(status != MC_OK) {
+        printf("could not import memcard\n");
 		while(true) {
 			led_blink_error(status);
 			sleep_ms(2000);
@@ -430,6 +435,8 @@ _Noreturn int simulate_memory_card() {
                     /* switch mc */
                     strcpy(mc_file_name, new_file_name);
                     status = memory_card_import(&mc, mc_file_name);
+                    update_prev_loaded_memcard_index(atoi(mc_file_name));
+                    printf("mc is: %s\n", mc_file_name);
                     if(status != MC_OK)
                         led_blink_error(status);
                     simulate_mc_reconnect();
@@ -482,7 +489,6 @@ _Noreturn int simulate_memory_card() {
             }else
                 led_blink_error(status);
             simulate_mc_reconnect();
-            //update_prev_loaded_memcard_index(atoi(new_name));
             indexfile = false;
             mutex_exit(&write_transaction);
         }
