@@ -11,6 +11,7 @@ PicoMemcard allows you to build your own supercharged PSX Memory Card that can b
 * Allows to play burned CDs (thanks to [FreePSXBoot])
 * Cheaper than an original memory card
 * Can store hudreds of memory card images
+* Switching memory cards using MemcardPro commands with L2/R2
 
 ## Bill of materials
 * **Raspberry Pi Pico** (around $5)
@@ -111,7 +112,9 @@ Inside `docs/images` you can find two memory card images. One has a couple of sa
 ## Switching/Creating Images
 On **PicoMemcard+** you can switch the active memory card image with the following inputs:
 * `START + SELECT + DPAD UP` will switch to the next image (e.g from `1.MCR` to `2.MCR`).
+* `START + SELECT + DPAD RIGHT` will switch to the next image by 5 (e.g from `1.MCR` to `6.MCR`).
 * `START + SELECT + DPAD DOWN` will switch to the previous image (e.g from `1.MCR` to `0.MCR`).
+* `START + SELECT + DPAD LEFT` will switch to the previous image by 5 (e.g from `6.MCR` to `1.MCR`).
 
 Additionally you can create a new empty memory card image (and automatically switch to it) by pressing  `START + SELECT + TRIANGLE`.
 
@@ -193,6 +196,7 @@ For people interested in understanding how PicoMemcard works I provide a more ex
 ## Thanks To
 * [Schermaiolo] - Writing the Game ID write function
 * [SantX27] - Debugging the 1.0.3 firmware to work on the Bitfunx Memory card
+* [whitezombie2000] - Extensive debugging and report of all bugs related to Picomemcard, without him the releases would be way more buggy.
 * [wired-filipino-owl] - Documentation and implementation of the led functionality on the Bitfunx Memory card.
 * [psx-spx] and Martin "NO$PSX" Korth - PlayStation Specifications and documented Memory Card protocol and filesystem.
 * [Andrew J. McCubbin] - Additional information about Memory Card and Controller communication with PSX.
@@ -203,6 +207,7 @@ For people interested in understanding how PicoMemcard works I provide a more ex
 
 [Schermaiolo]: https://github.com/schermaiolo
 [SantX27]: https://github.com/SantX27
+[whitezombie2000]: https://github.com/whitezombie2000
 [wired-filipino-owl]: https://github.com/wired-filipino-owl
 [FreePSXBoot]: https://github.com/brad-lin/FreePSXBoot
 [psx-spx]: https://psx-spx.consoledev.net/pinouts/#controller-ports-and-memory-card-ports
