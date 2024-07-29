@@ -23,8 +23,8 @@ uint32_t memcard_manager_get(uint32_t index, uint8_t* out_filename);
 #define memcard_manager_get_initial(out_filename) memcard_manager_get(memcard_manager_get_prev_loaded_memcard_index(), (out_filename))
 uint32_t update_prev_loaded_memcard_index(uint32_t index);
 uint32_t memcard_manager_get_prev_loaded_memcard_index();
-uint32_t memcard_manager_get_next(uint8_t* filename, uint8_t* out_nextfile);
-uint32_t memcard_manager_get_prev(uint8_t* filename, uint8_t* out_prevfile);
+uint32_t memcard_manager_get_next(uint8_t* filename, uint8_t* out_nextfile, bool skip);
+uint32_t memcard_manager_get_prev(uint8_t* filename, uint8_t* out_prevfile, bool skip);
 uint32_t memcard_manager_create(uint8_t* out_filename);
 uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename);
 #endif

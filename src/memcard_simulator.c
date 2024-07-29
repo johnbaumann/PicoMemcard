@@ -48,6 +48,7 @@ memory_card_t mc;
 bool request_next_mc = false;
 bool request_prev_mc = false;
 bool request_new_mc = false;
+bool skip = false;
 bool indexfile = false;
 mutex_t write_transaction;
 queue_t mc_sector_sync_queue;
@@ -192,9 +193,11 @@ void process_memcard_cmd() {
             {
                 SEND(0x00); // byte 1 reserved
                 RECV_CMD();
+                SEND(0x00); // byte 2 reserved
+                RECV_CMD();
                 SEND(0x20); // SUCC
                 RECV_CMD();
-                SEND(0xFF); // Termination signal
+                SEND(0xFF); // TERMINATION
                 request_prev_mc = true;
             }
             break;
@@ -204,10 +207,11 @@ void process_memcard_cmd() {
                 RECV_CMD();
                 SEND(0x00); // byte 2 reserved
                 RECV_CMD();
-                SEND(0x20); // SUCC
+                SEND(0x20); // SUCCESS
                 RECV_CMD();
-                SEND(0xFF); // Termination signal
+                SEND(0xFF); // TERMINATION
                 request_next_mc = true;
+
             }
             break;
         #ifdef GAMEID
@@ -218,18 +222,12 @@ void process_memcard_cmd() {
                 SEND(0x00); //reserved
                 game_id_len = RECV_CMD();
                 data = 0x00;
-                //if the xstation won't give us the length, then we are the length
-                if(game_id_len == 0){
-                    game_id_len = 24;
-                }
-                printf("%d\n", game_id_len);
                 /* read game id */
-                for(int i = 0; i < game_id_len; i++){
+                for(int i = 0; i < game_id_len; ++i){
                     SEND(data); // ack previous data
                     data = RECV_CMD();
                     game_id[i] = data;
                 }
-                printf("%s\n", game_id);
                 SEND(data); // ack last byte
                 indexfile = true;
             }
@@ -251,7 +249,15 @@ void process_pad_cmd() {    /* during pad interaction never call SEND() only int
         case START & SELECT & UP:
             request_next_mc = true;
             break;
+        case START & SELECT & RIGHT:
+            skip = true;
+            request_next_mc = true;
+            break;
         case START & SELECT & DOWN:
+            request_prev_mc = true;
+            break;
+        case START & SELECT & LEFT:
+            skip = true;
             request_prev_mc = true;
             break;
         case START & SELECT & TRIANGLE:
@@ -397,6 +403,8 @@ _Noreturn int simulate_memory_card() {
 
     /* SMs are automatically enabled on first SEL reset */
 
+    memset(game_id, 0, 24);
+
 	/* Launch memory card thread */
     printf("Starting simulation core...");
 	multicore_launch_core1(simulation_thread);
@@ -416,11 +424,12 @@ _Noreturn int simulate_memory_card() {
 				request_next_mc = false;
 				request_prev_mc = false;
 			} else {
+                uint8_t test = 0x10;
 				uint8_t new_file_name[MAX_MC_FILENAME_LEN + 1];
 				if(request_next_mc)
-					status = memcard_manager_get_next(mc_file_name, new_file_name);
+					status = memcard_manager_get_next(mc_file_name, new_file_name, skip);
 				else if (request_prev_mc)
-					status = memcard_manager_get_prev(mc_file_name, new_file_name);
+					status = memcard_manager_get_prev(mc_file_name, new_file_name, skip);
 				if(status != MM_OK) {
 					led_output_end_mc_list();
 					request_next_mc = false;
@@ -442,6 +451,7 @@ _Noreturn int simulate_memory_card() {
                     simulate_mc_reconnect();
                     request_next_mc = false;
                     request_prev_mc = false;
+                    skip = false;
                     mutex_exit(&write_transaction);
 				}
 			}
@@ -468,6 +478,7 @@ _Noreturn int simulate_memory_card() {
                 mutex_exit(&write_transaction);
 		} else if(indexfile){
             mutex_enter_blocking(&write_transaction);
+            printf("%s\n", game_id);
             /* ensure latest write operations have been synced */
             led_output_sync_status(true);
             while(!queue_is_empty(&mc_sector_sync_queue))
@@ -489,6 +500,7 @@ _Noreturn int simulate_memory_card() {
             }else
                 led_blink_error(status);
             simulate_mc_reconnect();
+            memset(game_id, '\0', 24);
             indexfile = false;
             mutex_exit(&write_transaction);
         }

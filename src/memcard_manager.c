@@ -58,7 +58,7 @@ uint32_t update_prev_loaded_memcard_index(uint32_t index) {
 		}else{
 			f_rewind(&data_file);
 			strcat(finalname, "LASTMEMCARD:");
-			sprintf(buff,"%d",index);
+			sprintf(buff,"%03d",index);
 			strcat(finalname, buff);
 			strcat(finalname, ".MCR\n");
 			printf("%s\n", finalname);
@@ -150,7 +150,7 @@ uint32_t memcard_manager_get_prev_loaded_memcard_index() {
 	return index;
 }
 
-uint32_t memcard_manager_get_next(uint8_t* filename, uint8_t* out_nextfile) {
+uint32_t memcard_manager_get_next(uint8_t* filename, uint8_t* out_nextfile, bool skip) {
 	if(!filename || !out_nextfile)
 		return MM_BAD_PARAM;
 	/* retrive images names */
@@ -161,13 +161,26 @@ uint32_t memcard_manager_get_next(uint8_t* filename, uint8_t* out_nextfile) {
 	char finalname[MAX_MC_FILENAME_LEN + 1];
 	memset(finalname, '\0', MAX_MC_FILENAME_LEN + 1);
 	uint32_t index = atoi(filename);
-	index++;
+	if(skip){
+		index += 5;
+	}else{
+		index++;
+	}
 	sprintf(finalname,"%d",index);
 	strcat(finalname, ".MCR");
 	res = f_stat(finalname, &f_info);
 	if(res == FR_NO_FILE){
-		printf("THE MCR DOES NOT EXISTS\n");
-		return MM_NO_ENTRY;
+		while(res == FR_NO_FILE){
+			printf("THE MCR DOES NOT EXISTS\n");
+			memset(finalname, '\0', MAX_MC_FILENAME_LEN + 1);
+			index--;
+			if(index < atoi(filename)){
+				return MM_NO_ENTRY;
+			}
+			sprintf(finalname,"%d",index);
+			strcat(finalname, ".MCR");
+			res = f_stat(finalname, &f_info);
+		}
 	}
 	strcpy(out_nextfile, finalname);
 	printf("next mc is: %s", out_nextfile);
@@ -175,7 +188,7 @@ uint32_t memcard_manager_get_next(uint8_t* filename, uint8_t* out_nextfile) {
 	return MM_OK;
 }
 
-uint32_t memcard_manager_get_prev(uint8_t* filename, uint8_t* out_prevfile) {
+uint32_t memcard_manager_get_prev(uint8_t* filename, uint8_t* out_prevfile, bool skip) {
 	if(!filename || !out_prevfile)
 		return MM_BAD_PARAM;
 	/* retrive images names */
@@ -185,7 +198,14 @@ uint32_t memcard_manager_get_prev(uint8_t* filename, uint8_t* out_prevfile) {
 	char finalname[MAX_MC_FILENAME_LEN + 1];
 	memset(finalname, '\0', MAX_MC_FILENAME_LEN + 1);
 	uint32_t index = atoi(filename);
-	index--;
+	if(skip){
+		index -= 5;
+	}else{
+		index--;
+	}
+	if(index < 0){
+		index = 0;
+	}
 	sprintf(finalname,"%d",index);
 	strcat(finalname, ".MCR");
 	res = f_stat(finalname, &f_info);
@@ -334,7 +354,10 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 	}
 
 	char data[128];
+	char n_data[128];
 	int ind = 0;
+	--size;
+
 	char lastmem[MAX_MC_FILENAME_LEN + 1];
 
 	//we init the var otherwise it will be dirty as hell
@@ -342,24 +365,37 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 	memset(new_name, '\0', MAX_MC_FILENAME_LEN + 1);
 	memset(out_filename, '\0', MAX_MC_FILENAME_LEN + 1);
 	memset(lastmem, '\0', MAX_MC_FILENAME_LEN + 1);
-
+	strcat(data, "\n");
+	bool backslash = false;
 	for(int i = 0; i < size; i++){
 		if(vec[i] == ':'){
 			for(int j = i + 1; j < size; j++){
+
+				// just to eliminate backslash from str
+				if(vec[j] == 92 && backslash == false){
+					backslash = true;
+					continue;
+				}
 				if(vec[j] == ';'){
 					ind++;
 					break;
 				}
-				data[ind] = vec[j];
+				n_data[ind] = vec[j];
 				ind++;
 			}
 		}
 	}
+
+	strcat(data, n_data);
 	printf("the array is: %s\n", data);
 	
 	// check if the string is \PSIO and if it is we get the hell out of here
-	if(strcmp(data, "\\PSIO") == 0 ||strcmp(data, "/XSTATION") == 0){
-		printf("\nSkipped psio/xstation\n");
+	if(strcmp(n_data, "\\PSIO") == 0 ||strcmp(n_data, "/XSTATION") == 0 || strcmp(n_data, "UNIROM") == 0 || strcmp(n_data, "\\UNIROM_B.EXE") == 0){
+		printf("\nSkipped psio/xstation/UNIROM\n");
+		f_close(&fptr);
+		return 1;
+	}else if(strlen(n_data) < 5){
+		printf("array too short, a comunication error might be occured\n");
 		f_close(&fptr);
 		return 1;
 	}
@@ -370,7 +406,7 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 		ind--;
 		//checks if the ID is already present
 		while (f_gets(line, sizeof(line), &fptr)){
-			if(strncmp(data, line, ind) == 0){
+			if(strncmp(n_data, line, ind) == 0){
 				flag = true;
 				printf("GAMEID already present\n");
 				break;
@@ -380,6 +416,8 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 		if(flag){
 			if(line[ind] == ':'){
 				int len = 1;
+				char buff[MAX_MC_FILENAME_LEN + 1];
+				memset(buff, '\0', MAX_MC_FILENAME_LEN + 1);
 				ind++;
 				for(int y = 0; y < MAX_MC_FILENAME_LEN + 1; y++){
 					if(line[ind] == '\n'){
@@ -389,10 +427,13 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 					ind++; 
 				}
 				strcpy(out_filename, new_name);
+
+				//updating lastmemcard id
 				f_rewind(&fptr);
 				strcat(lastmem, "LASTMEMCARD:");
-				strcat(lastmem, new_name);
-				strcat(lastmem, "\n");
+				sprintf(buff, "%03d", atoi(new_name));
+				strcat(lastmem, buff);
+				strcat(lastmem, ".MCR\n");
 				f_puts(lastmem, &fptr);
 				printf("memcard is: %s\n", out_filename);
 			}else{
@@ -407,9 +448,9 @@ uint32_t create_index(uint8_t *vec, uint8_t size, uint8_t *out_filename){
 			printf("GAMEID not present, writing to index.txt\n");
 			uint32_t status = memcard_manager_create(new_name);
 			//we concatenate stuff to have a valid id with the memcard
+			
 			strcat(data, ":");
 			strcat(data, new_name);
-			strcat(data, "\n");
 			printf("\n what i write: %s", data);
 			f_puts(data, &fptr);
 			strcpy(out_filename, new_name);

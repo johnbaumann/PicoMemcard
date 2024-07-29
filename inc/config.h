@@ -7,7 +7,7 @@
 #define IDLE_AUTOSYNC_TIMEOUT 5 * 1000		// time (in ms) the memory card must be inactive before automatic sync from RAM to LFS
 #define MAX_MC_FILENAME_LEN	32				// max length of memory card file name (including extension)
 #define MAX_MC_IMAGES	255					// maximum number of different mc images
-#define MC_RECONNECT_TIME	1000				// time (in ms) the memory card stays disconnected when simulating reconnection
+#define MC_RECONNECT_TIME	250				// time (in ms) the memory card stays disconnected when simulating reconnection
 
 /* Board targeted by build */
 //#define PICO
