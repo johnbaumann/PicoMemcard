@@ -57,13 +57,15 @@ set pindirs, 0			side 0	; release DAT line (set pin as input = Hi-Z)
 wait 0 gpio PIN_SEL		side 0	; wait for SEL to go low
 .wrap_target
 pull					side 0	; manual pull in order to stall SM if TX fifo is empty
-nop						side 1 [5]		; start ACK
-set x, 7				side 0 [5]		; stop ACK delay and set bit counter
+nop						side 1 [3]		; start ACK, hold low 2us
+set x, 7				side 0 [0]		; stop ACK delay and set bit counter
 sendbit:
 wait 1 gpio PIN_CLK		side 0			; stop ACK and check clock is high (sideset completes even if instruction stalls)
 wait 0 gpio PIN_CLK		side 0			; wait for falling clock edge
 out pindirs 1			side 0			; output 1 bit
 jmp x-- sendbit			side 0			; count and send 8 bits
+nop						side 0 [10]		; delay before sending ACK
+nop						side 0 [10]		; waiting for 6-7us
 .wrap
 
 % c-sdk {
